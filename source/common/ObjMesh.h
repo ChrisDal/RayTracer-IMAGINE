@@ -22,18 +22,18 @@ public:
 
   mat4 model_view;
 
-  Mesh(): box_min(std::numeric_limits< float >::max(),
-                  std::numeric_limits< float >::max(),
-                  std::numeric_limits< float >::max() ),
+  Mesh(): box_min((std::numeric_limits< float >::max)(),
+                  (std::numeric_limits< float >::max)(),
+                  (std::numeric_limits< float >::max)() ),
           box_max(0,0,0),
           center(0,0,0),
           scale(1.0),
           model_view(){ }
 
   Mesh(const char * path)
-    : box_min(std::numeric_limits< float >::max(),
-              std::numeric_limits< float >::max(),
-              std::numeric_limits< float >::max() ),
+    : box_min((std::numeric_limits< float >::max)(),
+              (std::numeric_limits< float >::max)(),
+              (std::numeric_limits< float >::max)() ),
     box_max(0,0,0),
     center(0,0,0),
     scale(1.0),

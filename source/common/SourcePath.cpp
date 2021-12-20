@@ -6,4 +6,4 @@
 
 #include "SourcePath.h"
 
-std::string source_path = "/home/noura/Documents/Cours/HMIN212/raytracer-template";
+std::string source_path = "D:/DALILA/ProgFormation/M2-IMAGINE/HMIN212/Lancer de rayon-20211220/raytracer-template";
