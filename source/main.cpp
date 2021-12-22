@@ -230,6 +230,45 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
 
     //TODO: Raytracing code here
 
+    // get last color from object hit 
+    /*vec4 lastcolor = lastHitObject->shadingValues.color; 
+    float contrib = 0.3f; // contribution of last object color */
+
+    std::vector < Object::IntersectionValues > intersections;
+
+    for (unsigned int i = 0; i < sceneObjects.size(); i++) {
+        intersections.push_back(sceneObjects[i]->intersect(p0, E));
+        intersections[intersections.size() - 1].ID_ = i;
+    }
+
+    Object::IntersectionValues closest; 
+    closest.t = std::numeric_limits< double >::infinity(); 
+    closest.ID_ = -1; 
+
+    for (unsigned int i = 0; i < intersections.size(); i++) {
+        if (intersections[i].t != std::numeric_limits< double >::infinity()) {
+            
+            if (true)
+            {
+                std::cout << "Hit " << intersections[i].name << " " << intersections[i].ID_ << "\n";
+                std::cout << "P: " << intersections[i].P << "\n";
+                std::cout << "N: " << intersections[i].N << "\n";
+                vec4 L = lightPosition - intersections[i].P;
+                L = normalize(L);
+                std::cout << "L: " << L << "\n";
+            }
+
+            if (intersections[i].t < closest.t) {
+                closest = intersections[i]; 
+            }
+
+        }
+    }
+
+    if (closest.ID_ != -1) {
+        color = sceneObjects[closest.ID_]->shadingValues.color;
+    }
+    
     return color;
 
 }
@@ -255,6 +294,8 @@ void rayTrace(){
     }
 
     write_image("output.png", buffer, GLState::window_width, GLState::window_height, 4);
+
+    std::cout << "Done writing image.\n"; 
 
     delete[] buffer;
 }
@@ -402,7 +443,7 @@ void initUnitSphere(){
     {
         sceneObjects.push_back(new Sphere("Diffuse sphere"));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.color = vec4(1.0,0.0,0.0,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 1.0;
         _shadingValues.Ks = 0.0;

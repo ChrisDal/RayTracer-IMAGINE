@@ -13,6 +13,29 @@
 Object::IntersectionValues Sphere::intersect(vec4 p0, vec4 V){
   IntersectionValues result;
   //TODO: Ray-sphere setup
+
+  /*typedef struct {
+      double t; // time 
+      vec4 P; // point of intersection 
+      vec4 N; // normal at P 
+      int ID_; // Id of object 
+      std::string name; // name of object 
+  } IntersectionValues;
+  */
+  result.ID_ = -1; 
+  result.t = this->raySphereIntersection(p0, V); 
+  result.name = this->name; 
+  result.N = vec4(1.0, 0.0, 0.0, 1.0);
+
+  if (result.t < (std::numeric_limits < double > ::max)())
+  {
+      // r(t) = o + t*d
+      vec4 point = p0 + result.t * V;
+      // normal = vec center point 
+      result.N = point - this->center;
+      result.N = Angel::normalize(result.N); 
+  }
+
   return result;
 }
 
@@ -21,6 +44,39 @@ Object::IntersectionValues Sphere::intersect(vec4 p0, vec4 V){
 double Sphere::raySphereIntersection(vec4 p0, vec4 V){
   double t   = std::numeric_limits< double >::infinity();
   //TODO: Ray-sphere intersection;
+
+  // t² d*d + 2t d*(origin rayon - center) + (norm(no-c)² - r²v
+ 
+  double c = Angel::dot(p0 - this->center, p0 - this->center) - this->radius* this->radius; // square norm 
+  double a = Angel::dot(V, V); 
+  double b = 2.0 * Angel::dot(V, p0 - this->center); 
+  double delta = b*b - (4 * a * c) ; 
+  if (delta < 0.0) 
+  {
+      return t; 
+  }
+  else if (std::fabs(delta) < Angel::DivideByZeroTolerance) // Take epsilon from Vec 1e-12
+  {
+      t = -b / (2.0 * a); 
+  }
+  else
+  {
+      double t1 = (-b + std::sqrt(delta)) / (2.0 * a); 
+      double t2 = (-b - std::sqrt(delta)) / (2.0 * a); 
+      // Keep first one to appear 
+
+      if (t1 > 0.0 && t2 > 0.0) 
+      {
+          t = min(t1, t2);
+      }
+      else
+      {
+          t = max(t1, t2); 
+      }
+
+      
+  }
+
   return t;
 }
 
