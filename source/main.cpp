@@ -295,8 +295,6 @@ void rayTrace(){
 
     write_image("output.png", buffer, GLState::window_width, GLState::window_height, 4);
 
-    std::cout << "Done writing image.\n"; 
-
     delete[] buffer;
 }
 
@@ -441,17 +439,35 @@ void initUnitSphere(){
     sceneObjects.clear();
 
     {
-        sceneObjects.push_back(new Sphere("Diffuse sphere"));
-        Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,0.0,0.0,1.0);
-        _shadingValues.Ka = 0.0;
-        _shadingValues.Kd = 1.0;
-        _shadingValues.Ks = 0.0;
-        _shadingValues.Kn = 16.0;
-        _shadingValues.Kt = 0.0;
-        _shadingValues.Kr = 0.0;
-        sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
-        sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
+        {
+            sceneObjects.push_back(new Sphere("Diffuse sphere", vec3(0.5, 0.0, -1.0)));
+            Object::ShadingValues _shadingValues;
+            _shadingValues.color = vec4(1.0, 0.0, 0.0, 1.0);
+            _shadingValues.Ka = 0.0;
+            _shadingValues.Kd = 1.0;
+            _shadingValues.Ks = 0.0;
+            _shadingValues.Kn = 16.0;
+            _shadingValues.Kt = 0.0;
+            _shadingValues.Kr = 0.0;
+            sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+            sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+
+        }
+
+        {
+
+            sceneObjects.push_back(new Sphere("Diffuse sphere2", vec3(-1.0, 0.0, 1.0)));
+            Object::ShadingValues _shadingValues;
+            _shadingValues.color = vec4(0.0, 1.0, 0.0, 1.0);
+            _shadingValues.Ka = 0.0;
+            _shadingValues.Kd = 1.0;
+            _shadingValues.Ks = 0.0;
+            _shadingValues.Kn = 16.0;
+            _shadingValues.Kt = 0.0;
+            _shadingValues.Kr = 0.0;
+            sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+            sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+        }
     }
 
 }
@@ -468,7 +484,7 @@ void initUnitSquare(){
     { //Back Wall
         sceneObjects.push_back(new Square("Unit Square"));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.color = vec4(1.0,0.0,0.0,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 1.0;
         _shadingValues.Ks = 0.0;

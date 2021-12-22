@@ -30,9 +30,9 @@ Object::IntersectionValues Sphere::intersect(vec4 p0, vec4 V){
   if (result.t < (std::numeric_limits < double > ::max)())
   {
       // r(t) = o + t*d
-      vec4 point = p0 + result.t * V;
+      result.P = p0 + result.t * V;
       // normal = vec center point 
-      result.N = point - this->center;
+      result.N = result.P - this->center;
       result.N = Angel::normalize(result.N); 
   }
 
@@ -85,6 +85,13 @@ double Sphere::raySphereIntersection(vec4 p0, vec4 V){
 Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
   IntersectionValues result;
   //TODO: Ray-square setup
+
+  result.ID_ = -1;
+  result.t = this->raySquareIntersection(p0, V);
+  result.name = this->name;
+  result.N = this->normal;
+  // r(t) = o + t*d
+  result.P = p0 + result.t * V;
   
   return result;
 }
@@ -94,5 +101,14 @@ Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
 double Square::raySquareIntersection(vec4 p0, vec4 V){
   double t   = std::numeric_limits< double >::infinity();
   //TODO: Ray-square intersection;
+
+  
+  if (std::fabs(Angel::dot(V, this->normal)) < Angel::DivideByZeroTolerance) {
+      return t; 
+  }
+
+  double D = Angel::dot(this->point, this->normal);
+  t = (D - Angel::dot(p0, this->normal)) / Angel::dot(V, this->normal);
+
   return t;
 }
