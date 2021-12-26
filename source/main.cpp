@@ -191,22 +191,54 @@ bool intersectionSort(Object::IntersectionValues i, Object::IntersectionValues j
 void castRayDebug(vec4 p0, vec4 dir){
 
     std::vector < Object::IntersectionValues > intersections;
+    Object::IntersectionValues closest; 
 
     for(unsigned int i=0; i < sceneObjects.size(); i++){
         intersections.push_back(sceneObjects[i]->intersect(p0, dir));
         intersections[intersections.size()-1].ID_ = i;
     }
 
+    closest.t = std::numeric_limits< double >::infinity(); 
+
+    OutputDebugString("---------------------\n");
+
     for(unsigned int i=0; i < intersections.size(); i++){
         if(intersections[i].t != std::numeric_limits< double >::infinity()){
-            std::cout << "Hit " << intersections[i].name << " " << intersections[i].ID_ << "\n";
-            std::cout << "P: " <<  intersections[i].P << "\n";
-            std::cout << "N: " <<  intersections[i].N << "\n";
+            std::string message =  "Hit " + intersections[i].name + " " + std::to_string(intersections[i].ID_) + "\n";
+            OutputDebugString(message.c_str()); 
+            message =  "P: " + intersections[i].P.to_string() + "\n";
+            OutputDebugString(message.c_str());
+            message = "N: " +  intersections[i].N.to_string() + "\n";
+            OutputDebugString(message.c_str());
             vec4 L = lightPosition-intersections[i].P;
             L  = normalize(L);
-            std::cout << "L: " << L << "\n";
+            message = "L: " + L.to_string() + "\n";
+            OutputDebugString(message.c_str());
+            message = "t: " + std::to_string(intersections[i].t) + "\n";
+            OutputDebugString(message.c_str());
+
+            message = "Name : " + intersections[i].name + "\n"; 
+            OutputDebugString(message.c_str()); 
+
+            if (std::fabs(intersections[i].t) < closest.t && intersections[i].t >= 0.0)
+            {
+                closest.t = intersections[i].t; 
+                closest.name = intersections[i].name;
+                closest.ID_ = intersections[i].ID_; 
+            }
+   
+            
         }
+
+        OutputDebugString("=============================\n");
     }
+
+    if (closest.ID_ != -1) {
+        std::string message = "Closest " + closest.name + "\n";
+        OutputDebugString(message.c_str());
+    }
+
+    OutputDebugString("---------------------\n");
 
 }
 
@@ -248,16 +280,6 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     for (unsigned int i = 0; i < intersections.size(); i++) {
         if (intersections[i].t != std::numeric_limits< double >::infinity()) {
             
-            if (true)
-            {
-                std::cout << "Hit " << intersections[i].name << " " << intersections[i].ID_ << "\n";
-                std::cout << "P: " << intersections[i].P << "\n";
-                std::cout << "N: " << intersections[i].N << "\n";
-                vec4 L = lightPosition - intersections[i].P;
-                L = normalize(L);
-                std::cout << "L: " << L << "\n";
-            }
-
             if (intersections[i].t < closest.t) {
                 closest = intersections[i]; 
             }
@@ -317,7 +339,7 @@ void initCornellBox(){
     { //Back Wall
         sceneObjects.push_back(new Square("Back Wall", Translate(0.0, 0.0, -2.0)*Scale(2.0,2.0,1.0)));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.color = vec4(0.2,0.8,1.0,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 1.0;
         _shadingValues.Ks = 0.0;
@@ -331,7 +353,7 @@ void initCornellBox(){
     { //Left Wall
         sceneObjects.push_back(new Square("Left Wall", RotateY(90)*Translate(0.0, 0.0, -2.0)*Scale(2.0,2.0,1.0)));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,0.0,0.0,1.0);
+        _shadingValues.color = vec4(1.0,0.0,0.2,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 1.0;
         _shadingValues.Ks = 0.0;
@@ -359,7 +381,7 @@ void initCornellBox(){
     { //Floor
         sceneObjects.push_back(new Square("Floor", RotateX(-90)*Translate(0.0, 0.0, -2.0)*Scale(2.0, 2.0, 1.0)));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.color = vec4(0.3,0.3,0.3,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 1.0;
         _shadingValues.Ks = 0.0;
@@ -373,7 +395,7 @@ void initCornellBox(){
     { //Ceiling
         sceneObjects.push_back(new Square("Ceiling", RotateX(90)*Translate(0.0, 0.0, -2.0)*Scale(2.0, 2.0, 1.0)));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.color = vec4(0.5,0.5,0.5,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 1.0;
         _shadingValues.Ks = 0.0;

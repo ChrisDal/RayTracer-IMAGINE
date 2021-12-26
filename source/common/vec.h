@@ -8,6 +8,7 @@
 #define __ANGEL_VEC_H__
 
 #include "common.h"
+#include <string>
 
 namespace Angel {
 
@@ -417,6 +418,13 @@ struct vec4 {
 
     friend std::istream& operator >> ( std::istream& is, vec4& v )
 	{ return is >> v.x >> v.y >> v.z >> v.w; }
+
+    std::string to_string() const { 
+        return std::string('(' + std::to_string((float)this->x) + ',' 
+                            + std::to_string((float)this->y) + ','
+                            + std::to_string((float)this->z) + ',' 
+                            + std::to_string((float)this->w) + ')');
+    }
 
     //
     //  --- Conversion Operators ---

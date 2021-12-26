@@ -89,9 +89,19 @@ Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
   result.ID_ = -1;
   result.t = this->raySquareIntersection(p0, V);
   result.name = this->name;
-  result.N = this->normal;
+  result.N = vec4(this->normal, 0.0);
   // r(t) = o + t*d
   result.P = p0 + result.t * V;
+
+  // inside square 
+  bool inside = insideSquare(result.P); 
+  if (! inside) {
+      result.t = std::numeric_limits< double >::infinity();
+  }
+
+  std::string msg = "Inside =" + std::to_string(int(inside)) + "\n";
+  OutputDebugString(msg.c_str());
+
   
   return result;
 }
@@ -100,15 +110,54 @@ Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
 /* -------------------------------------------------------------------------- */
 double Square::raySquareIntersection(vec4 p0, vec4 V){
   double t   = std::numeric_limits< double >::infinity();
+  vec4 N = vec4(this->normal, 0.0); 
   //TODO: Ray-square intersection;
+  // t = (D - p0.n) / (V.n)  
+  // t = (a - o).n / d.n 
 
   
-  if (std::fabs(Angel::dot(V, this->normal)) < Angel::DivideByZeroTolerance) {
+  if (std::fabs(Angel::dot(V, N)) < Angel::DivideByZeroTolerance) {
       return t; 
   }
 
-  double D = Angel::dot(this->point, this->normal);
-  t = (D - Angel::dot(p0, this->normal)) / Angel::dot(V, this->normal);
+  // Plane intersection
+  double D = Angel::dot(this->point, N);
+  t = (D - Angel::dot(p0, N)) / Angel::dot(V, N);
+
+  /*std::string msg = "D=" + std::to_string(D) + "\n"; 
+  OutputDebugString(msg.c_str()); 
+  msg = "o.n = " + std::to_string(Angel::dot(p0, N)) + "\n";
+  OutputDebugString(msg.c_str());
+  msg = "d.n = " + std::to_string(Angel::dot(V, N)) + "\n";
+  OutputDebugString(msg.c_str());*/
+
+  
 
   return t;
+}
+
+double Square::signedTrigArea(const vec4& a, const vec4& b, const vec4& c) const
+{
+    vec3 crossprod = Angel::cross(b - a, c - a);
+    return 0.5 * crossprod.z;
+}
+
+bool Square::insideTriangle(const vec4& a, const vec4& b, const vec4& c, const vec4& p ) const
+{
+    double aireABC= signedTrigArea(a, b, c);
+    double alpha  = signedTrigArea(p, b, c) / aireABC;
+    double beta   = signedTrigArea(a, p, c) / aireABC;
+    double gamma  = signedTrigArea(a, b, p) / aireABC;
+
+    return alpha >= 0.0 && beta >= 0.0 && gamma >= 0.0;
+}
+
+bool Square::insideSquare(const vec4& p) const
+{
+    // Inside Square / not triangle
+    bool trigABC = insideTriangle(mesh.vertices[0], mesh.vertices[1], mesh.vertices[2], p); 
+    bool trigDEF = insideTriangle(mesh.vertices[3], mesh.vertices[4], mesh.vertices[5], p); 
+
+
+    return trigABC || trigDEF;
 }

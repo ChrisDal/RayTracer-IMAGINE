@@ -34,6 +34,11 @@
 // Define a helpful macro for handling offsets into buffer objects
 #define BUFFER_OFFSET( offset )   ((GLvoid*) (offset))
 
+
+// Define cout for Windows 
+#if defined(_WIN32)
+    #include "debugapi.h"
+#endif
 //----------------------------------------------------------------------------
 //
 //  --- Include our class libraries and constants ---

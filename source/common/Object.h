@@ -124,6 +124,9 @@ public:
 
 private:
     double raySquareIntersection(vec4 p0, vec4 V);
+    double signedTrigArea(const vec4& a, const vec4& b, const vec4& c) const;
+    bool insideTriangle(const vec4& a, const vec4& b, const vec4& c, const vec4& p) const;
+    bool insideSquare(const vec4& p) const; 
     vec4 point;
     vec3 normal;
 };
