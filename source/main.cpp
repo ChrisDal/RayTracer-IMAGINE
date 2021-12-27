@@ -8,6 +8,7 @@
 #include "common.h"
 #include "SourcePath.h"
 
+
 using namespace Angel;
 
 typedef vec4  color4;
@@ -241,15 +242,13 @@ void castRayDebug(vec4 p0, vec4 dir){
 }
 
 /* -------------------------------------------------------------------------- */
-bool shadowFeeler(vec4 p0, Object *object){
+bool shadowFeeler(vec4 p0, Object *object, vec4 lightp){
     bool inShadow = false;
 
-    //TODO: Shadow code here
-
     // Light Direction
-    vec4 L = lightPosition - p0;
-    Angel::normalize(L); 
-    L.w = 0.0; 
+    vec4 L = lightp - p0;
+    Angel::normalize(L);
+    L.w = 0.0;
 
     // Cast a single ray towards Light 
     // -------------------------------
@@ -268,7 +267,7 @@ bool shadowFeeler(vec4 p0, Object *object){
     for (unsigned int i = 0; i < rayXover.size(); i++) {
         if (rayXover[i].t != std::numeric_limits< double >::infinity()) {
 
-            if (std::fabs(rayXover[i].t) < closest.t && rayXover[i].t > 2.0*EPSILON) {
+            if (std::fabs(rayXover[i].t) < closest.t && rayXover[i].t > 2.0 * EPSILON) {
                 closest = rayXover[i];
             }
 
@@ -278,12 +277,41 @@ bool shadowFeeler(vec4 p0, Object *object){
     if (closest.ID_ != -1)
     {
         // test if object is before light 
-        double lp0 = Angel::length(lightPosition - p0); 
+        double lp0 = Angel::length(lightp - p0);
         double lpX = Angel::length(closest.P - p0);
         inShadow = lp0 - lpX > 0.0;
     }
-    
     return inShadow;
+}
+
+
+float softShadow(vec4 p0, Object* object, int Nsamples=10)
+{
+    // Soft Shadows 
+    int nInShadows = 0;
+    double squareSide = 2.0;
+    std::vector<vec4> lightspos = { lightPosition };
+
+    // Take N samples 
+    for (int k = 0; k < Nsamples-1; k++) {
+
+        double x = (-squareSide / 2.0) + (std::rand()) / ((double)RAND_MAX / squareSide);
+        double z = (-squareSide / 2.0) + (std::rand()) / ((double)RAND_MAX / squareSide);
+
+        lightspos.push_back(lightPosition + vec4(x, 0.0, z, 0.0));
+    }
+
+
+    for (int klight = 0; klight < Nsamples; klight++)
+    {
+        bool inshadowK = shadowFeeler(p0, object, lightspos[klight]);
+        if (inshadowK) { nInShadows++;  }
+
+    }
+
+
+    return (float)nInShadows / (float)Nsamples;
+
 }
 
 /* -------------------------------------------------------------------------- */
@@ -320,12 +348,6 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
 
     if (closest.ID_ != -1) {
         
-        // In shadow or not 
-        // ------------------
-        bool inShadow = shadowFeeler(closest.P, sceneObjects[closest.ID_]);
-        if (inShadow) {
-            return  vec4(0.0, 0.0, 0.0, 1.0);
-        }
         
         // Ambiant Ia = Isa * Ka 
         // ----------------------
@@ -360,7 +382,17 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
         // Phong Equation
         // ---------------
         color = (ambiant*lightColor + diffuse* lightColor + specular* lightColor) * sceneObjects[closest.ID_]->shadingValues.color;
+
+
+        // Shadows :
+        // ----------
+        // Compute "hard" shadow if Nsamples = 1 
+        // Compute soft Shadows if Nsamples > 1 ( require at least 128 or 256 shadow rays) 
+        int nsamples = 1; 
+        float percentageShadowed = softShadow(closest.P, sceneObjects[closest.ID_], nsamples);
+        color *= (1.0 - percentageShadowed); 
         color.w = 1.0; 
+
 
     }
 
