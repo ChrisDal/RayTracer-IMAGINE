@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////
+﻿//////////////////////////////////////////////////////////////////////////////
 //
 //  --- main.cpp ---
 //  Created by Brian Summa
@@ -15,7 +15,7 @@ typedef vec4  point4;
 
 
 //Scene variables
-enum{_SPHERE, _SQUARE, _BOX};
+enum{_SPHERE, _SQUARE, _BOX, _BOXEASYSPHERE};
 int scene = _SPHERE; //Simple sphere, square or cornell box
 std::vector < Object * > sceneObjects;
 point4 lightPosition;
@@ -191,7 +191,8 @@ bool intersectionSort(Object::IntersectionValues i, Object::IntersectionValues j
 void castRayDebug(vec4 p0, vec4 dir){
 
     std::vector < Object::IntersectionValues > intersections;
-    Object::IntersectionValues closest; 
+    Object::IntersectionValues closest;
+    closest.ID_ = -1; 
 
     for(unsigned int i=0; i < sceneObjects.size(); i++){
         intersections.push_back(sceneObjects[i]->intersect(p0, dir));
@@ -245,6 +246,43 @@ bool shadowFeeler(vec4 p0, Object *object){
 
     //TODO: Shadow code here
 
+    // Light Direction
+    vec4 L = lightPosition - p0;
+    Angel::normalize(L); 
+    L.w = 0.0; 
+
+    // Cast a single ray towards Light 
+    // -------------------------------
+    std::vector < Object::IntersectionValues > rayXover;
+
+    for (unsigned int i = 0; i < sceneObjects.size(); i++) {
+        rayXover.push_back(sceneObjects[i]->intersect(p0, L));
+        rayXover[rayXover.size() - 1].ID_ = i;
+    }
+
+    // Closest Intersection 
+    Object::IntersectionValues closest;
+    closest.t = std::numeric_limits< double >::infinity();
+    closest.ID_ = -1;
+
+    for (unsigned int i = 0; i < rayXover.size(); i++) {
+        if (rayXover[i].t != std::numeric_limits< double >::infinity()) {
+
+            if (std::fabs(rayXover[i].t) < closest.t && rayXover[i].t > 2.0*EPSILON) {
+                closest = rayXover[i];
+            }
+
+        }
+    }
+
+    if (closest.ID_ != -1)
+    {
+        // test if object is before light 
+        double lp0 = Angel::length(lightPosition - p0); 
+        double lpX = Angel::length(closest.P - p0);
+        inShadow = lp0 - lpX > 0.0;
+    }
+    
     return inShadow;
 }
 
@@ -258,10 +296,6 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     if(depth > maxDepth){ return color; }
 
     //TODO: Raytracing code here
-
-    // get last color from object hit 
-    /*vec4 lastcolor = lastHitObject->shadingValues.color; 
-    float contrib = 0.3f; // contribution of last object color */
 
     std::vector < Object::IntersectionValues > intersections;
 
@@ -285,9 +319,52 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     }
 
     if (closest.ID_ != -1) {
-        color = sceneObjects[closest.ID_]->shadingValues.color;
         
+        // In shadow or not 
+        // ------------------
+        bool inShadow = shadowFeeler(closest.P, sceneObjects[closest.ID_]);
+        if (inShadow) {
+            return  vec4(0.0, 0.0, 0.0, 1.0);
+        }
+        
+        // Ambiant Ia = Isa * Ka 
+        // ----------------------
+        double Isa = 1.0;
+        double ambiant = Isa * sceneObjects[closest.ID_]->shadingValues.Ka;
+
+        // Light Position 
+        // ----------------------
+        vec4 L = lightPosition - closest.P;
+        L = normalize(L);
+        L.w = 0.0; 
+
+        // Diffuse
+        // -------------------------------
+        double Id = 1.0; 
+        double diffuse = Id * sceneObjects[closest.ID_]->shadingValues.Kd * max(Angel::dot(L, closest.N), 0.0); 
+
+        // Reflexion
+        // -------------
+        double Iss = 1.0; 
+        double nr = 32; // exponent
+        // R =  2 (N.L)N - L
+        vec4 R = - reflect(L, closest.N); // =  2.0 * Angel::dot(closest.N, L) * closest.N - L;
+        R = Angel::normalize(R); 
+        vec4 V = -E; // - direction du rayon 
+        Angel::normalize(V);
+        V.w = 0.0; 
+       
+        // Is = Iss * Ks * dot(R, V)^n  
+        double specular = Iss * sceneObjects[closest.ID_]->shadingValues.Ks * std::pow(max(Angel::dot(V,R), 0.0), nr ) ;
+
+        // Phong Equation
+        // ---------------
+        color = (ambiant*lightColor + diffuse* lightColor + specular* lightColor) * sceneObjects[closest.ID_]->shadingValues.color;
+        color.w = 1.0; 
+
     }
+
+    
     
     return color;
 
@@ -432,7 +509,7 @@ void initCornellBox(){
         sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
         sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
     }
-
+    
     {
         sceneObjects.push_back(new Sphere("Mirrored Sphere", vec3(-1.0, -1.25, 0.5),0.75));
         Object::ShadingValues _shadingValues;
@@ -440,6 +517,159 @@ void initCornellBox(){
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 0.0;
         _shadingValues.Ks = 1.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
+    }
+    
+    
+    
+
+    /*{
+        sceneObjects.push_back(new Sphere("Diffuse Sphere", vec3(1.0, -1.25, 0.5),0.75));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0, 0.0, 0.0, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    {
+        sceneObjects.push_back(new Sphere("Specular + Diffuse Sphere", vec3(-1.0, -1.25, 0.5),0.75));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 0.2;
+        _shadingValues.Ks = 0.8;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
+    }*/
+}
+
+
+void initCornellBox2() {
+    cameraPosition = point4(0.0, 0.0, 6.0, 1.0);
+    lightPosition = point4(0.0, 1.5, 0.0, 1.0);
+    lightColor = color4(1.0, 1.0, 1.0, 1.0);
+
+    sceneObjects.clear();
+
+    { //Back Wall
+        sceneObjects.push_back(new Square("Back Wall", Translate(0.0, 0.0, -2.0) * Scale(2.0, 2.0, 1.0)));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.2, 0.8, 1.0, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    { //Left Wall
+        sceneObjects.push_back(new Square("Left Wall", RotateY(90) * Translate(0.0, 0.0, -2.0) * Scale(2.0, 2.0, 1.0)));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0, 0.0, 0.2, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    { //Right Wall
+        sceneObjects.push_back(new Square("Right Wall", RotateY(-90) * Translate(0.0, 0.0, -2.0) * Scale(2.0, 2.0, 1.0)));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.5, 0.0, 0.5, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    { //Floor
+        sceneObjects.push_back(new Square("Floor", RotateX(-90) * Translate(0.0, 0.0, -2.0) * Scale(2.0, 2.0, 1.0)));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.3, 0.3, 0.3, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    { //Ceiling
+        sceneObjects.push_back(new Square("Ceiling", RotateX(90) * Translate(0.0, 0.0, -2.0) * Scale(2.0, 2.0, 1.0)));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.5, 0.5, 0.5, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    { //Front Wall
+        sceneObjects.push_back(new Square("Front Wall", RotateY(180) * Translate(0.0, 0.0, -2.0) * Scale(2.0, 2.0, 1.0)));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0, 1.0, 1.0, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+
+    {
+        sceneObjects.push_back(new Sphere("Diffuse Sphere", vec3(1.0, -1.25, 0.5),0.75));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0, 0.0, 0.0, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 1.0;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    {
+        sceneObjects.push_back(new Sphere("Specular + Diffuse Sphere", vec3(-1.0, -1.25, 0.5),0.75));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 0.6;
+        _shadingValues.Ks = 0.2;
         _shadingValues.Kn = 16.0;
         _shadingValues.Kt = 0.0;
         _shadingValues.Kr = 0.0;
@@ -545,6 +775,14 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
             initCornellBox();
             initGL();
             scene = _BOX;
+        }
+    }
+
+    if (key == GLFW_KEY_4 && action == GLFW_PRESS) {
+        if (scene != _BOXEASYSPHERE) {
+            initCornellBox2();
+            initGL();
+            scene = _BOXEASYSPHERE;
         }
     }
 
@@ -803,6 +1041,9 @@ int main(void){
     case _BOX:
         initCornellBox();
         break;
+    case _BOXEASYSPHERE:
+        initCornellBox2();
+        break;
     }
 
     initGL();
@@ -845,6 +1086,9 @@ int main(void){
             break;
         case _BOX:
             GLState::projection = Perspective( 45.0, aspect, 4.5, 100.0 );
+            break;
+        case _BOXEASYSPHERE:
+            GLState::projection = Perspective(45.0, aspect, 4.5, 100.0);
             break;
         }
 
