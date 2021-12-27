@@ -99,8 +99,8 @@ Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
       result.t = std::numeric_limits< double >::infinity();
   }
 
-  std::string msg = "Inside =" + std::to_string(int(inside)) + "\n";
-  OutputDebugString(msg.c_str());
+  //std::string msg = "Inside =" + std::to_string(int(inside)) + "\n";
+  //OutputDebugString(msg.c_str());
 
   
   return result;
@@ -139,7 +139,7 @@ double Square::raySquareIntersection(vec4 p0, vec4 V){
 double Square::signedTrigArea(const vec4& a, const vec4& b, const vec4& c) const
 {
     vec3 crossprod = Angel::cross(b - a, c - a);
-    return 0.5 * crossprod.z;
+    return 0.5 * Angel::dot(this->normal, crossprod) ;
 }
 
 bool Square::insideTriangle(const vec4& a, const vec4& b, const vec4& c, const vec4& p ) const

@@ -200,24 +200,18 @@ void castRayDebug(vec4 p0, vec4 dir){
 
     closest.t = std::numeric_limits< double >::infinity(); 
 
-    OutputDebugString("---------------------\n");
-
     for(unsigned int i=0; i < intersections.size(); i++){
         if(intersections[i].t != std::numeric_limits< double >::infinity()){
-            std::string message =  "Hit " + intersections[i].name + " " + std::to_string(intersections[i].ID_) + "\n";
-            OutputDebugString(message.c_str()); 
-            message =  "P: " + intersections[i].P.to_string() + "\n";
-            OutputDebugString(message.c_str());
-            message = "N: " +  intersections[i].N.to_string() + "\n";
-            OutputDebugString(message.c_str());
+            
             vec4 L = lightPosition-intersections[i].P;
             L  = normalize(L);
-            message = "L: " + L.to_string() + "\n";
-            OutputDebugString(message.c_str());
-            message = "t: " + std::to_string(intersections[i].t) + "\n";
-            OutputDebugString(message.c_str());
 
-            message = "Name : " + intersections[i].name + "\n"; 
+            std::string message = "Hit " + intersections[i].name + " " + std::to_string(intersections[i].ID_) + "\n";
+            message += "P: " + intersections[i].P.to_string() + "\n";
+            message += "N: " + intersections[i].N.to_string() + "\n";
+            message += "L: " + L.to_string() + "\n";
+            message += "t: " + std::to_string(intersections[i].t) + "\n";
+            message += "Name : " + intersections[i].name + "\n"; 
             OutputDebugString(message.c_str()); 
 
             if (std::fabs(intersections[i].t) < closest.t && intersections[i].t >= 0.0)
@@ -227,18 +221,21 @@ void castRayDebug(vec4 p0, vec4 dir){
                 closest.ID_ = intersections[i].ID_; 
             }
    
-            
+            OutputDebugString("---------------------\n");
         }
 
-        OutputDebugString("=============================\n");
+        
     }
+
+    OutputDebugString("~~~~~~~~~~~~~~\n");
 
     if (closest.ID_ != -1) {
         std::string message = "Closest " + closest.name + "\n";
         OutputDebugString(message.c_str());
     }
 
-    OutputDebugString("---------------------\n");
+    OutputDebugString("=============================\n");
+    
 
 }
 
@@ -280,7 +277,7 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     for (unsigned int i = 0; i < intersections.size(); i++) {
         if (intersections[i].t != std::numeric_limits< double >::infinity()) {
             
-            if (intersections[i].t < closest.t) {
+            if (std::fabs(intersections[i].t) < closest.t && intersections[i].t >= 0.0){
                 closest = intersections[i]; 
             }
 
@@ -289,6 +286,7 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
 
     if (closest.ID_ != -1) {
         color = sceneObjects[closest.ID_]->shadingValues.color;
+        
     }
     
     return color;
