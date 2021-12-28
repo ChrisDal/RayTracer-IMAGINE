@@ -24,7 +24,7 @@ color4 lightColor;
 point4 cameraPosition;
 
 //Recursion depth for raytracer
-int maxDepth = 3;
+int maxDepth = 8;
 
 void initGL();
 
@@ -127,10 +127,16 @@ bool write_image(const char* filename, const unsigned char *Src,
     rayTraceReceptor image(Src,Width,Height,channels);
     the_encoder.set_receptor(&image);
     result = the_encoder.write_file(filename);
-    if (result == cmps3120::PNG_DONE)
-        std::cerr << "finished writing "<<filename<<"."<<std::endl;
-    else
-        std::cerr << "write to "<<filename<<" returned error code "<<result<<"."<<std::endl;
+    if (result == cmps3120::PNG_DONE) {
+        std::cerr << "finished writing " << filename << "." << std::endl;
+        std::string msg = "finished writing ";
+        msg += filename;
+        msg += "\n"; 
+        OutputDebugString(msg.c_str());
+    }
+    else {
+        std::cerr << "write to " << filename << " returned error code " << result << "." << std::endl;
+    }
     return result==cmps3120::PNG_DONE;
 }
 
@@ -216,7 +222,7 @@ void castRayDebug(vec4 p0, vec4 dir){
             message += "Name : " + intersections[i].name + "\n"; 
             OutputDebugString(message.c_str()); 
 
-            if (std::fabs(intersections[i].t) < closest.t && intersections[i].t >= 0.0)
+            if (std::fabs(intersections[i].t) < closest.t && intersections[i].t > 0.0)
             {
                 closest.t = intersections[i].t; 
                 closest.name = intersections[i].name;
@@ -242,7 +248,38 @@ void castRayDebug(vec4 p0, vec4 dir){
 }
 
 /* -------------------------------------------------------------------------- */
-bool shadowFeeler(vec4 p0, Object *object, vec4 lightp){
+
+// utility function 
+void clampColor(vec4& color) {
+    double colorMax = max(max(color.x, color.y), color.z); 
+    
+    if (colorMax > 1.0)
+    {
+        color.x /= colorMax;
+        color.y /= colorMax;
+        color.z /= colorMax;
+    }
+    
+    color.w = 1.0;
+}
+
+void equalizeColor(vec4& color) {
+    double colorMax = max(max(color.x, color.y), color.z);
+
+    if (colorMax > 1.0)
+    {
+        color.x /= colorMax;
+        color.y /= colorMax;
+        color.z /= colorMax;
+    }
+
+    color.w = 1.0;
+}
+
+
+
+// shadow Feeler : true if hits any object before reaching lightsource 
+bool shadowFeeler(const vec4& p0, Object *object, const vec4& lightp){
     bool inShadow = false;
 
     // Light Direction
@@ -252,40 +289,31 @@ bool shadowFeeler(vec4 p0, Object *object, vec4 lightp){
 
     // Cast a single ray towards Light 
     // -------------------------------
-    std::vector < Object::IntersectionValues > rayXover;
+    Object::IntersectionValues rayXover;
+    rayXover.t = std::numeric_limits< double >::infinity();
+    rayXover.ID_ = -1;
 
     for (unsigned int i = 0; i < sceneObjects.size(); i++) {
-        rayXover.push_back(sceneObjects[i]->intersect(p0, L));
-        rayXover[rayXover.size() - 1].ID_ = i;
-    }
-
-    // Closest Intersection 
-    Object::IntersectionValues closest;
-    closest.t = std::numeric_limits< double >::infinity();
-    closest.ID_ = -1;
-
-    for (unsigned int i = 0; i < rayXover.size(); i++) {
-        if (rayXover[i].t != std::numeric_limits< double >::infinity()) {
-
-            if (std::fabs(rayXover[i].t) < closest.t && rayXover[i].t > 2.0 * EPSILON) {
-                closest = rayXover[i];
-            }
-
+        Object::IntersectionValues inter = sceneObjects[i]->intersect(p0, L);
+        if (std::fabs(inter.t) < rayXover.t && inter.t >= 2.0*EPSILON) {
+            rayXover = inter;
+            rayXover.ID_ = i; 
         }
     }
 
-    if (closest.ID_ != -1)
+    if (rayXover.ID_ != -1)
     {
         // test if object is before light 
         double lp0 = Angel::length(lightp - p0);
-        double lpX = Angel::length(closest.P - p0);
-        inShadow = lp0 - lpX > 0.0;
+        double lpX = Angel::length(rayXover.P - p0);
+        inShadow = (lp0 - lpX ) > 0.0;
     }
     return inShadow;
 }
 
-
-float softShadow(vec4 p0, Object* object, int Nsamples=10)
+// Soft Shadows from an area lightsource (uniform sampling of source in square 2.0 x 2.0)
+// advise : Nsamples = 128 or 256 to get interesting render
+float softShadow(const vec4& p0, Object* object, const int& Nsamples=10)
 {
     // Soft Shadows 
     int nInShadows = 0;
@@ -314,6 +342,14 @@ float softShadow(vec4 p0, Object* object, int Nsamples=10)
 
 }
 
+double schlick(const double& cosT, const double& nrf)
+{
+    double r0 = (1.0 - nrf) / (1.0 + nrf); 
+    r0 *= r0; 
+    return r0 + (1.0 - r0) * std::pow((1.0 - cosT), 5); 
+}
+
+
 /* -------------------------------------------------------------------------- */
 /* ----------  cast Ray = p0 + t*dir and intersect with sphere      --------- */
 /* ----------  return color, right now shading is approx based      --------- */
@@ -339,15 +375,16 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     for (unsigned int i = 0; i < intersections.size(); i++) {
         if (intersections[i].t != std::numeric_limits< double >::infinity()) {
             
-            if (std::fabs(intersections[i].t) < closest.t && intersections[i].t >= 0.0){
+            if (std::fabs(intersections[i].t) < closest.t && intersections[i].t >= 2.0 * EPSILON){
                 closest = intersections[i]; 
             }
 
         }
     }
 
+    
+
     if (closest.ID_ != -1) {
-        
         
         // Ambiant Ia = Isa * Ka 
         // ----------------------
@@ -361,39 +398,136 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
         L.w = 0.0; 
 
         // Diffuse
-        // -------------------------------
+        // --------
         double Id = 1.0; 
         double diffuse = Id * sceneObjects[closest.ID_]->shadingValues.Kd * max(Angel::dot(L, closest.N), 0.0); 
 
-        // Reflexion
-        // -------------
-        double Iss = 1.0; 
-        double nr = 32; // exponent
-        // R =  2 (N.L)N - L
-        vec4 R = - reflect(L, closest.N); // =  2.0 * Angel::dot(closest.N, L) * closest.N - L;
-        R = Angel::normalize(R); 
+        // Direction Vector : R , V 
+        // ---------------------------
+        // R :reflection 
+        // V : towards observ
+        vec4 R = -reflect(L, closest.N); // =  2.0 * Angel::dot(closest.N, L) * closest.N - L;
+        R = Angel::normalize(R);
+        R.w = 0.0; 
+
         vec4 V = -E; // - direction du rayon 
-        Angel::normalize(V);
-        V.w = 0.0; 
-       
-        // Is = Iss * Ks * dot(R, V)^n  
-        double specular = Iss * sceneObjects[closest.ID_]->shadingValues.Ks * std::pow(max(Angel::dot(V,R), 0.0), nr ) ;
+        V.w = 0.0;
 
+        
+        // Specular :  Is = Iss * Ks * dot(R, V)^n 
+        // ----------------------------------------
+        double Iss = 1.0;
+        double nr = sceneObjects[closest.ID_]->shadingValues.Kn; // exponent
+        double specular = Iss * sceneObjects[closest.ID_]->shadingValues.Ks * std::pow(max(Angel::dot(V, R), 0.0), nr);
+        
+
+        // ===============
         // Phong Equation
-        // ---------------
-        color = (ambiant*lightColor + diffuse* lightColor + specular* lightColor) * sceneObjects[closest.ID_]->shadingValues.color;
+        // ===============
+        color = (ambiant * lightColor + diffuse * lightColor )* sceneObjects[closest.ID_]->shadingValues.color;
+        color += specular * lightColor * sceneObjects[closest.ID_]->shadingValues.color;
+        clampColor(color); 
 
-
+        // ==========================================
         // Shadows :
         // ----------
         // Compute "hard" shadow if Nsamples = 1 
         // Compute soft Shadows if Nsamples > 1 ( require at least 128 or 256 shadow rays) 
-        int nsamples = 1; 
-        float percentageShadowed = softShadow(closest.P, sceneObjects[closest.ID_], nsamples);
-        color *= (1.0 - percentageShadowed); 
-        color.w = 1.0; 
+        int nsamples = 1;
+        float percentageShadowed = softShadow(closest.P, sceneObjects[closest.ID_], nsamples); // 0 : 1
+        // Applied Shadows
+        color *= (1.0 - percentageShadowed);
+        color.w = 1.0;
+        
 
+        // ==========================================
+        // Recursivity Rays
+        // ==================
+        double attenuation = 1.0 / ((double)depth + 1.0);
 
+        // Specular Contribution secondary rays 
+        //-----------------------------------------
+
+        color4 specColor = vec4(0.0, 0.0, 0.0, 0.0);
+        if (sceneObjects[closest.ID_]->shadingValues.Ks > 0.0)
+        {
+            vec4 reflectionDir = - reflect(V, closest.N);
+            specColor = castRay(closest.P, reflectionDir, sceneObjects[closest.ID_], depth + 1);
+            clampColor(specColor);
+        }
+
+        // Transparency  
+        // ------------
+        // if last material is transparent add color of hitten object 
+        color4 refractColor = vec4(0.0, 0.0, 0.0, 0.0);
+        std::string refractmsg = "[Refract MESSAGE] : \n"; 
+        if (sceneObjects[closest.ID_]->shadingValues.Kt > 0.0 && sceneObjects[closest.ID_]->shadingValues.Kr > 0.0)
+        {
+            // Refraction 
+            // ----------
+            // kr1 * sin(theta1) = kr2 * sin(theta2) 
+            
+            // coefficient de refraction
+            double kr1 = 1.0; // Air coefficient of refraction 
+            /*if (lastHitObject != nullptr && lastHitObject->shadingValues.Kr > 0.0) {
+                kr1 = lastHitObject->shadingValues.Kr; 
+            }*/
+
+            double kr2 = sceneObjects[closest.ID_]->shadingValues.Kr; 
+            
+            vec4 vecInc = E; 
+            vecInc = normalize(vecInc);
+            vecInc.w = 0.0;
+            // transmission : vector of refracted ray 
+            double cosTheta = Angel::dot(vecInc, normalize(closest.N)); // out 
+            vec4 normalPlanR = closest.N;
+            // outside towards air 
+            if (cosTheta > 0.0)
+            {
+                normalPlanR = -closest.N;
+                kr2 = kr1; 
+                kr1 = sceneObjects[closest.ID_]->shadingValues.Kr;  
+                cosTheta = -cosTheta; 
+            }
+
+            double nrf = kr1 / kr2; // n = n1 / n2 
+            double cosTheta2 = dot(vecInc, normalPlanR); 
+
+            double discriminant = 1.0 - (nrf * nrf) * (1.0 - cosTheta2*cosTheta2);
+
+            double reflect_prob = discriminant > 0.0 ? schlick(cosTheta, nrf) : 1.0; // reflection si refraction impossible
+            double randN = std::rand() / (RAND_MAX + 1.0); 
+
+            if (discriminant < 0.0)
+            {
+                // refraction => reflection
+                vec4 dirReflected = -reflect(V, closest.N);
+                //refractColor = vec4(0.8, 0.2, 0.2, 1.0); 
+                refractColor = castRay(closest.P, dirReflected, sceneObjects[closest.ID_], depth + 1);
+            }
+            else
+            {
+                // Refraction 
+                vec4 dirRefractTan = nrf * (vecInc - dot(vecInc, normalPlanR) * normalPlanR); // composante tangentielle 
+                vec4 dirRefractNor = - normalPlanR * std::sqrt(discriminant); // composante normale
+                vec4 dirRefract = dirRefractTan + dirRefractNor;
+                dirRefract = normalize(dirRefract);
+                dirRefract.w = 0.0;
+                refractColor = castRay(closest.P - dirRefract * EPSILON, dirRefract, sceneObjects[closest.ID_], depth + 1);
+            }
+
+            clampColor(refractColor);            
+            //OutputDebugString(refractmsg.c_str()); 
+
+        }
+
+        color = sceneObjects[closest.ID_]->shadingValues.Kt * refractColor  +
+                sceneObjects[closest.ID_]->shadingValues.Ks * specColor  +
+                color * max(0.0, (1.0 - 
+                                    sceneObjects[closest.ID_]->shadingValues.Ks  - 
+                                    sceneObjects[closest.ID_]->shadingValues.Kt ));
+
+        clampColor(color); 
     }
 
     
@@ -401,6 +535,7 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     return color;
 
 }
+
 
 /* -------------------------------------------------------------------------- */
 /* ------------  Ray trace our scene.  Output color to image and    --------- */
@@ -414,7 +549,7 @@ void rayTrace(){
 
             int idx = j*GLState::window_width+i;
             std::vector < vec4 > ray_o_dir = findRay(i,j);
-            vec4 color = castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z,0.0), NULL, 0);
+            vec4 color = castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z,0.0), NULL, 1);
             buffer[4*idx]   = color.x*255;
             buffer[4*idx+1] = color.y*255;
             buffer[4*idx+2] = color.z*255;
@@ -528,32 +663,62 @@ void initCornellBox(){
     }
 
 
+    
     {
-        sceneObjects.push_back(new Sphere("Glass sphere", vec3(1.0, -1.25, 0.5),0.75));
+        sceneObjects.push_back(new Sphere("Diffuse Yellow Sphere", vec3(1.25, -1.75, -1.80), 0.25));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0, 1.0, 0.0, 1.0);
+        _shadingValues.Ka = 0.2;
+        _shadingValues.Kd = 0.8;
+        _shadingValues.Ks = 0.005;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+    
+    {
+        sceneObjects.push_back(new Sphere("Glass sphere", vec3(1.0, -1.0, 0.0),0.75));
         Object::ShadingValues _shadingValues;
         _shadingValues.color = vec4(1.0,0.0,0.0,1.0);
         _shadingValues.Ka = 0.0;
         _shadingValues.Kd = 0.0;
-        _shadingValues.Ks = 0.0;
-        _shadingValues.Kn = 16.0;
-        _shadingValues.Kt = 1.0;
-        _shadingValues.Kr = 1.4;
+        _shadingValues.Ks = 0.0; // reflexion speculaire
+        _shadingValues.Kn = 16.0;// shininess
+        _shadingValues.Kt = 1.0; // coefficient de transmission
+        _shadingValues.Kr = 1.4; // indice de refraction
         sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
         sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
     }
     
     {
-        sceneObjects.push_back(new Sphere("Mirrored Sphere", vec3(-1.0, -1.25, 0.5),0.75));
+        sceneObjects.push_back(new Sphere("Grey Mirrored Sphere", vec3(-1.0, -1.25, -0.5),0.75));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
+        _shadingValues.color = vec4(0.5,0.5,0.5,1.0);
         _shadingValues.Ka = 0.0;
-        _shadingValues.Kd = 0.0;
-        _shadingValues.Ks = 1.0;
+        _shadingValues.Kd = 0.2;
+        _shadingValues.Ks = 0.8;
         _shadingValues.Kn = 16.0;
         _shadingValues.Kt = 0.0;
         _shadingValues.Kr = 0.0;
         sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
         sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
+    }
+
+
+    {
+        sceneObjects.push_back(new Sphere("Diffuse Yellow Sphere", vec3(0.0, -1.75, 1.5), 0.25));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.0, 1.0, 1.0, 1.0);
+        _shadingValues.Ka = 0.2;
+        _shadingValues.Kd = 0.8;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
     }
     
     
@@ -682,11 +847,11 @@ void initCornellBox2() {
 
 
     {
-        sceneObjects.push_back(new Sphere("Diffuse Sphere", vec3(1.0, -1.25, 0.5),0.75));
+        sceneObjects.push_back(new Sphere("Diffuse Sphere", vec3(1.0, -1.25, -0.5),0.5));
         Object::ShadingValues _shadingValues;
         _shadingValues.color = vec4(1.0, 0.0, 0.0, 1.0);
-        _shadingValues.Ka = 0.0;
-        _shadingValues.Kd = 1.0;
+        _shadingValues.Ka = 0.2;
+        _shadingValues.Kd = 0.8;
         _shadingValues.Ks = 0.0;
         _shadingValues.Kn = 16.0;
         _shadingValues.Kt = 0.0;
@@ -696,17 +861,74 @@ void initCornellBox2() {
     }
 
     {
-        sceneObjects.push_back(new Sphere("Specular + Diffuse Sphere", vec3(-1.0, -1.25, 0.5),0.75));
+        sceneObjects.push_back(new Sphere("Ambiant + Diffuse Green Sphere", vec3(0.8, 0.8, -0.5 ), 0.15));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(1.0,1.0,1.0,1.0);
-        _shadingValues.Ka = 0.0;
-        _shadingValues.Kd = 0.6;
-        _shadingValues.Ks = 0.2;
+        _shadingValues.color = vec4(0.1, 0.8, 0.1, 1.0);
+        _shadingValues.Ka = 0.5;
+        _shadingValues.Kd = 0.5;
+        _shadingValues.Ks = 0.0;
+        _shadingValues.Kn = 8.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    {
+        sceneObjects.push_back(new Sphere("Silver Sphere", vec3(0.5, 0.0, 1.5), 0.25));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.5, 0.5, 0.5, 1.0);
+        _shadingValues.Ka = 0.19225;
+        _shadingValues.Kd = 0.50754;
+        _shadingValues.Ks = 0.50827;
+        _shadingValues.Kn = 32.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+    {
+        sceneObjects.push_back(new Sphere("Specular + Ambient Sphere", vec3(-0.5, -1.25, 0.35),0.5));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.2,0.0,1.0,1.0);
+        _shadingValues.Ka = 0.2;
+        _shadingValues.Kd = 0.8;
+        _shadingValues.Ks = 0.0;
         _shadingValues.Kn = 16.0;
         _shadingValues.Kt = 0.0;
         _shadingValues.Kr = 0.0;
         sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
         sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
+    }
+
+    {
+        sceneObjects.push_back(new Sphere("Grey Mirrored Sphere", vec3(-1.0, -1.25, -0.8), 0.75));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(0.5, 0.5, 0.5, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 0.1;
+        _shadingValues.Ks = 0.9;
+        _shadingValues.Kn = 16.0;
+        _shadingValues.Kt = 0.0;
+        _shadingValues.Kr = 0.0;
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+    }
+
+
+    {
+        sceneObjects.push_back(new Sphere("Glass sphere", vec3(1.0, -1.0, 0.25), 0.25));
+        Object::ShadingValues _shadingValues;
+        _shadingValues.color = vec4(1.0, 0.0, 0.0, 1.0);
+        _shadingValues.Ka = 0.0;
+        _shadingValues.Kd = 0.0;
+        _shadingValues.Ks = 0.0; // reflexion speculaire
+        _shadingValues.Kn = 16.0;// shininess
+        _shadingValues.Kt = 1.0; // coefficient de transmission
+        _shadingValues.Kr = 1.4; // indice de refraction
+        sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+        sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
     }
 }
 
