@@ -22,9 +22,10 @@ std::vector < Object * > sceneObjects;
 point4 lightPosition;
 color4 lightColor;
 point4 cameraPosition;
+constexpr float dcam = 0.15f; 
 
 //Recursion depth for raytracer
-int maxDepth = 8;
+int maxDepth = 5;
 
 void initGL();
 
@@ -317,7 +318,7 @@ float softShadow(const vec4& p0, Object* object, const int& Nsamples=10)
 {
     // Soft Shadows 
     int nInShadows = 0;
-    double squareSide = 2.0;
+    double squareSide = 5.0;
     std::vector<vec4> lightspos = { lightPosition };
 
     // Take N samples 
@@ -443,7 +444,7 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
         // ==========================================
         // Recursivity Rays
         // ==================
-        double attenuation = 1.0 / ((double)depth + 1.0);
+        double attenuation = 1.0 / (double)(depth + 1.0);
 
         // Specular Contribution secondary rays 
         //-----------------------------------------
@@ -455,12 +456,16 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
             specColor = castRay(closest.P, reflectionDir, sceneObjects[closest.ID_], depth + 1);
             clampColor(specColor);
         }
+        else if (lastHitObject != nullptr)
+        {
+            clampColor(color); 
+            return color; 
+        }
 
         // Transparency  
         // ------------
         // if last material is transparent add color of hitten object 
         color4 refractColor = vec4(0.0, 0.0, 0.0, 0.0);
-        std::string refractmsg = "[Refract MESSAGE] : \n"; 
         if (sceneObjects[closest.ID_]->shadingValues.Kt > 0.0 && sceneObjects[closest.ID_]->shadingValues.Kr > 0.0)
         {
             // Refraction 
@@ -517,14 +522,13 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
             }
 
             clampColor(refractColor);            
-            //OutputDebugString(refractmsg.c_str()); 
 
         }
 
         color = sceneObjects[closest.ID_]->shadingValues.Kt * refractColor  +
-                sceneObjects[closest.ID_]->shadingValues.Ks * specColor  +
+                sceneObjects[closest.ID_]->shadingValues.Ks * specColor * attenuation +
                 color * max(0.0, (1.0 - 
-                                    sceneObjects[closest.ID_]->shadingValues.Ks  - 
+                                    sceneObjects[closest.ID_]->shadingValues.Ks * attenuation -
                                     sceneObjects[closest.ID_]->shadingValues.Kt ));
 
         clampColor(color); 
@@ -542,14 +546,26 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
 /* -----------   Output color to image and save to disk             --------- */
 void rayTrace(){
 
+    static unsigned int nraysample = 10; 
     unsigned char *buffer = new unsigned char[GLState::window_width*GLState::window_height*4];
 
-    for(unsigned int i=0; i < GLState::window_width; i++){
-        for(unsigned int j=0; j < GLState::window_height; j++){
+
+    for(int i=0; i < GLState::window_width; i++){
+        
+        for(int j=0; j < GLState::window_height; j++){
 
             int idx = j*GLState::window_width+i;
-            std::vector < vec4 > ray_o_dir = findRay(i,j);
-            vec4 color = castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z,0.0), NULL, 1);
+            // anti aliasing 
+            vec4 color(0.0, 0.0, 0.0, 0.0); 
+            for (int k = 0; k < nraysample; k++) {
+                double xi = (-0.5) + std::rand() / (double)RAND_MAX;
+                double yj = (-0.5) + std::rand() / (double)RAND_MAX;
+                std::vector < vec4 > ray_o_dir = findRay(i +xi, j+ yj);
+                color += castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z, 0.0), NULL, 1);
+            }
+
+            color /= (double)nraysample;
+            color.w = 1.0; 
             buffer[4*idx]   = color.x*255;
             buffer[4*idx+1] = color.y*255;
             buffer[4*idx+2] = color.z*255;
@@ -665,7 +681,7 @@ void initCornellBox(){
 
     
     {
-        sceneObjects.push_back(new Sphere("Diffuse Yellow Sphere", vec3(1.25, -1.75, -1.80), 0.25));
+        sceneObjects.push_back(new Sphere("Diffuse Yellow Sphere", vec3(1.25, -1.5, -1.80), 0.15));
         Object::ShadingValues _shadingValues;
         _shadingValues.color = vec4(1.0, 1.0, 0.0, 1.0);
         _shadingValues.Ka = 0.2;
@@ -686,7 +702,7 @@ void initCornellBox(){
         _shadingValues.Kd = 0.0;
         _shadingValues.Ks = 0.0; // reflexion speculaire
         _shadingValues.Kn = 16.0;// shininess
-        _shadingValues.Kt = 1.0; // coefficient de transmission
+        _shadingValues.Kt = 0.8; // coefficient de transmission
         _shadingValues.Kr = 1.4; // indice de refraction
         sceneObjects[sceneObjects.size()-1]->setShadingValues(_shadingValues);
         sceneObjects[sceneObjects.size()-1]->setModelView(mat4());
@@ -708,13 +724,13 @@ void initCornellBox(){
 
 
     {
-        sceneObjects.push_back(new Sphere("Diffuse Yellow Sphere", vec3(0.0, -1.75, 1.5), 0.25));
+        sceneObjects.push_back(new Sphere("Diffuse Green Sphere", vec3(-1.0, -1.5, 1.0), 0.5));
         Object::ShadingValues _shadingValues;
-        _shadingValues.color = vec4(0.0, 1.0, 1.0, 1.0);
-        _shadingValues.Ka = 0.2;
-        _shadingValues.Kd = 0.8;
-        _shadingValues.Ks = 0.0;
-        _shadingValues.Kn = 16.0;
+        _shadingValues.color = vec4(0.1, 1.0, 0.1, 1.0);
+        _shadingValues.Ka = 0.1;
+        _shadingValues.Kd = 0.6;
+        _shadingValues.Ks = 0.1;
+        _shadingValues.Kn = 32.0;
         _shadingValues.Kt = 0.0;
         _shadingValues.Kr = 0.0;
         sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
@@ -1043,6 +1059,22 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
 
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
         rayTrace();
+
+    if (key == GLFW_KEY_UP && action == GLFW_PRESS) {
+        cameraPosition = Translate(vec3(0.0f, 0.0f, -dcam)) * cameraPosition;
+    }
+    else if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) {
+        cameraPosition = Translate(vec3(0.0f, 0.0f, dcam)) * cameraPosition;
+    }
+
+    if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
+        cameraPosition = Translate(vec3(0.0f, -dcam, 0.0f)) * cameraPosition;
+    }
+    else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
+        cameraPosition = Translate(vec3(0.0f, dcam, 0.0)) * cameraPosition;
+    }
+
+
 }
 
 /* -------------------------------------------------------------------------- */

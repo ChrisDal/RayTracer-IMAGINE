@@ -12,7 +12,6 @@
 /* -------------------------------------------------------------------------- */
 Object::IntersectionValues Sphere::intersect(vec4 p0, vec4 V){
   IntersectionValues result;
-  //TODO: Ray-sphere setup
 
   /*typedef struct {
       double t; // time 
@@ -43,10 +42,8 @@ Object::IntersectionValues Sphere::intersect(vec4 p0, vec4 V){
 /* ------ Ray = p0 + t*V  sphere at origin center and radius radius    : Find t ------- */
 double Sphere::raySphereIntersection(vec4 p0, vec4 V){
   double t   = std::numeric_limits< double >::infinity();
-  //TODO: Ray-sphere intersection;
-
+  
   // t² d*d + 2t d*(origin rayon - center) + (norm(no-c)² - r²v
- 
   double c = Angel::dot(p0 - this->center, p0 - this->center) - this->radius* this->radius; // square norm 
   double a = Angel::dot(V, V); 
   double b = 2.0 * Angel::dot(V, p0 - this->center); 
@@ -84,7 +81,6 @@ double Sphere::raySphereIntersection(vec4 p0, vec4 V){
 /* -------------------------------------------------------------------------- */
 Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
   IntersectionValues result;
-  //TODO: Ray-square setup
 
   result.ID_ = -1;
   result.t = this->raySquareIntersection(p0, V);
@@ -99,10 +95,6 @@ Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
       result.t = std::numeric_limits< double >::infinity();
   }
 
-  //std::string msg = "Inside =" + std::to_string(int(inside)) + "\n";
-  //OutputDebugString(msg.c_str());
-
-  
   return result;
 }
 
@@ -111,27 +103,16 @@ Object::IntersectionValues Square::intersect(vec4 p0, vec4 V){
 double Square::raySquareIntersection(vec4 p0, vec4 V){
   double t   = std::numeric_limits< double >::infinity();
   vec4 N = vec4(this->normal, 0.0); 
-  //TODO: Ray-square intersection;
+
   // t = (D - p0.n) / (V.n)  
   // t = (a - o).n / d.n 
 
-  
   if (std::fabs(Angel::dot(V, N)) < Angel::DivideByZeroTolerance) {
       return t; 
   }
-
   // Plane intersection
   double D = Angel::dot(this->point, N);
   t = (D - Angel::dot(p0, N)) / Angel::dot(V, N);
-
-  /*std::string msg = "D=" + std::to_string(D) + "\n"; 
-  OutputDebugString(msg.c_str()); 
-  msg = "o.n = " + std::to_string(Angel::dot(p0, N)) + "\n";
-  OutputDebugString(msg.c_str());
-  msg = "d.n = " + std::to_string(Angel::dot(V, N)) + "\n";
-  OutputDebugString(msg.c_str());*/
-
-  
 
   return t;
 }
@@ -157,7 +138,6 @@ bool Square::insideSquare(const vec4& p) const
     // Inside Square / not triangle
     bool trigABC = insideTriangle(mesh.vertices[0], mesh.vertices[1], mesh.vertices[2], p); 
     bool trigDEF = insideTriangle(mesh.vertices[3], mesh.vertices[4], mesh.vertices[5], p); 
-
 
     return trigABC || trigDEF;
 }
