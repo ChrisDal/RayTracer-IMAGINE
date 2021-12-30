@@ -438,7 +438,7 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     // Compute "hard" shadow if Nsamples = 1 
     // Compute soft Shadows if Nsamples > 1 ( require at least 128 or 256 shadow rays) 
     
-    int nsamples = 1;
+    int nsamples = 256;
     float percentageShadowed = softShadow(closest.P + L * EPSILON, sceneObjects[closest.ID_], nsamples); // 0 : 1
     // Applied Shadows
     color *= (1.0 - percentageShadowed);
@@ -897,6 +897,27 @@ void initCornellBox2() {
             _shadingValues.Ka = 0.2;
             _shadingValues.Kd = 0.8;
             _shadingValues.Ks = 0.0;
+            _shadingValues.Kn = 16.0;
+            _shadingValues.Kt = 0.0;
+            _shadingValues.Kr = 0.0;
+            sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+            sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+        }
+
+        {
+            vec4 col = vec4(std::rand() / (double)RAND_MAX, std::rand() / (double)RAND_MAX, std::rand() / (double)RAND_MAX, 1.0);
+            double sizeSp = 0.05 + 0.35 * std::rand() / (double)RAND_MAX;
+            double x = -2.0 + sizeSp + (4.0 - 2.0 * sizeSp) * (std::rand() / (double)(RAND_MAX));
+            double z = -1.5 + 2.5 * (std::rand() / (double)(RAND_MAX));
+            double y = -2.0 + sizeSp + (4.0 - 2.0 - sizeSp) * (std::rand() / (double)(RAND_MAX));
+            vec3 spherePos = vec3(x, y, z);
+            std::string name = "Amb + Diffuse + Specular Sphere " + std::to_string(ki);
+            sceneObjects.push_back(new Sphere(name, spherePos, sizeSp));
+            Object::ShadingValues _shadingValues;
+            _shadingValues.color = col;
+            _shadingValues.Ka = 0.2;
+            _shadingValues.Kd = 0.8;
+            _shadingValues.Ks = 0.24;
             _shadingValues.Kn = 16.0;
             _shadingValues.Kt = 0.0;
             _shadingValues.Kr = 0.0;
