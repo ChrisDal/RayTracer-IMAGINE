@@ -4,7 +4,7 @@ Dans le cadre du Master Informatique parcours IMAGINE, réalisation d'un raytrac
 ![Image 1](data/results/output-hardshadow-gamma2.png)
 
 *Hard Shadow (One-ray cast) with gamma 2 correction
-Composition: a yellow ball is hiddent behind glass material, rose sphere is specular (+ diffuse & ambient), green is mainly diffuse (+ambient), ball in the left back is entirely specular.*
+Composition: a yellow ball is hidden behind glass material, rose sphere is specular (+ diffuse & ambient), green is mainly diffuse (+ambient), ball in the left back is entirely specular.*
 
 
 Implémentation: 
@@ -57,6 +57,9 @@ Exemple de rendu Scène 4 pseudo-aléatoire : anti-aliasing (64 échantillons pa
 
 ![Scene 4 avec Gamma 2 correction](data/results/output-antialiasing-hardsw.png)
 
+
+
+
 Exemple de rendu : pas d'anti-aliasing (1 échantillon par pixel), soft-shadow (128 échantillons)
 
 ![Scene 3 Soft Shadow](data/results/cornell_softshadows128sr.png)
@@ -65,3 +68,7 @@ Exemple de rendu : pas d'anti-aliasing (1 échantillon par pixel), soft-shadow (
 Exemple de rendu Scène 4 pseudo-aléatoire : anti-aliasing (64 échantillons par pixel), hard-shadow 
 
 ![Scene 4 avec Gamma 2 correction](data/results/output-random.png)
+
+Exemple de rendu Scène 4 pseudo-aléatoire : anti-aliasing (64 échantillons par pixel), soft-shadow (256 échantillons)
+
+![Scene 4 avec anti-aliasing soft-shadow and gammaCorr](data/results/output-softshadow-gamma2.png)
