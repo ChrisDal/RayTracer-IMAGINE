@@ -1,7 +1,7 @@
 # Implementation Basique RayTracing 
 Dans le cadre du Master Informatique parcours IMAGINE, réalisation d'un raytracer simple sur CPU. Exemple de rendu de scène (3) : 
 
-![Image 1](data/results/output-hardsw-gamma2.png)
+![Image 1](data/results/output-hardshadow-gamma2.png)
 
 *Hard Shadow (One-ray cast) with gamma 2 correction
 Composition: a yellow ball is hiddent behind glass material, rose sphere is specular (+ diffuse & ambient), green is mainly diffuse (+ambient), ball in the left back is entirely specular.*
@@ -64,4 +64,4 @@ Exemple de rendu : pas d'anti-aliasing (1 échantillon par pixel), soft-shadow (
 
 Exemple de rendu Scène 4 pseudo-aléatoire : anti-aliasing (64 échantillons par pixel), hard-shadow 
 
-![Scene 4 avec Gamma 2 correction](data/results/output.png)
+![Scene 4 avec Gamma 2 correction](data/results/output-random.png)
