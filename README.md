@@ -67,7 +67,7 @@ Exemple de rendu : pas d'anti-aliasing (1 échantillon par pixel), soft-shadow (
 
 Exemple de rendu Scène 4 pseudo-aléatoire : anti-aliasing (64 échantillons par pixel), hard-shadow 
 
-![Scene 4 avec Gamma 2 correction](data/results/output-random.png)
+![Scene 4 avec Gamma 2 correction](data/results/output-srandom.png)
 
 Exemple de rendu Scène 4 pseudo-aléatoire : anti-aliasing (64 échantillons par pixel), soft-shadow (256 échantillons)
 
