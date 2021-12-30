@@ -334,7 +334,7 @@ float softShadow(const vec4& p0, Object* object, const int& Nsamples=10)
         lightspos.push_back(lightPosition + vec4(x, 0.0, z, 0.0));
     }
 
-
+    //#pragma omp parallel for shared(nInShadows)
     for (int klight = 0; klight < Nsamples; klight++)
     {
         bool inshadowK = shadowFeeler(p0, object, lightspos[klight]);
@@ -342,9 +342,7 @@ float softShadow(const vec4& p0, Object* object, const int& Nsamples=10)
 
     }
 
-
     return (float)nInShadows / (float)Nsamples;
-
 }
 
 double schlick(const double& cosT, const double& nrf)
@@ -420,7 +418,6 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
     vec4 V = -E; // - direction du rayon 
     V.w = 0.0;
 
-        
     // Specular :  Is = Iss * Ks * dot(R, V)^n 
     // ----------------------------------------
     double Iss = 1.0;
@@ -513,9 +510,6 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
             refractColor = castRay(closest.P - dirRefract * EPSILON, dirRefract, sceneObjects[closest.ID_], depth + 1);
             equalizeColor(refractColor);
         }
-        
-        
-        
 
     }
 
@@ -541,12 +535,9 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
                                 sceneObjects[closest.ID_]->shadingValues.Ks * attenuation -
                                 sceneObjects[closest.ID_]->shadingValues.Kt));
 
-
     equalizeColor(color);
 
-
     return color;
-
 }
 
 
@@ -555,29 +546,42 @@ vec4 castRay(vec4 p0, vec4 E, Object *lastHitObject, int depth){
 /* -----------   Output color to image and save to disk             --------- */
 void rayTrace(){
 
-    static unsigned int nraysample = 1; 
+    static unsigned int nraysample = 64; 
     unsigned char *buffer = new unsigned char[GLState::window_width*GLState::window_height*4];
 
-    int i, j;
-    //#pragma omp parallel for private(y, cx, cy, cz) shared(nraysimple, buffer)
+
     for(int i=0; i < GLState::window_width; i++){
         
         for(int j=0; j < GLState::window_height; j++){
 
             int idx = j*GLState::window_width+i;
-            std::vector < vec4 > ray_o_dir = findRay(i, j);
-            vec4 color = castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z, 0.0), NULL, 0);
+            /*std::vector < vec4 > ray_o_dir = findRay(i, j);
+            vec4 color = castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z, 0.0), NULL, 0);*/
 
             // anti aliasing 
-            /*vec4 color(0.0, 0.0, 0.0, 0.0);
+            vec4 color(0.0, 0.0, 0.0, 0.0);
+            double cx = 0.0;  
+            double cy = 0.0;  
+            double cz = 0.0;  
+            //#pragma omp parallel for reduction(+:cx,cy,cz,cw)
             for (int k = 0; k < nraysample; k++) {
-                double xi = (-0.5) + std::rand() / (double)RAND_MAX;
-                double yj = (-0.5) + std::rand() / (double)RAND_MAX;
+                double xi = std::rand() / (double)RAND_MAX;
+                double yj = std::rand() / (double)RAND_MAX;
                 std::vector < vec4 > ray_o_dir = findRay(i +xi, j+ yj);
-                color += castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z, 0.0), NULL, 1);
+                vec4 col = castRay(ray_o_dir[0], vec4(ray_o_dir[1].x, ray_o_dir[1].y, ray_o_dir[1].z, 0.0), NULL, 1);
+                cx += col.x; 
+                cy += col.y; 
+                cz += col.z; 
             }
-            color /= (double)nraysample;*/
 
+            color = vec4(cx, cy, cz, 0.0) / (double)nraysample;
+
+            // Gamma correction : 2 
+            // ---------------------
+            // std::pow(color, 1. / gamma  ) 
+            color.x = std::sqrt(color.x); 
+            color.y = std::sqrt(color.y); 
+            color.z = std::sqrt(color.z);
             color.w = 1.0; 
             
             buffer[4*idx]   = color.x*255;
@@ -875,13 +879,19 @@ void initCornellBox2() {
         sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
     }
 
-    for (unsigned int ki = 0; ki < 10; ki++)
+    // Diffuse 
+    for (unsigned int ki = 0; ki < 6; ki++)
     {
         
         {
             vec4 col = vec4(std::rand() / (double)RAND_MAX, std::rand() / (double)RAND_MAX, std::rand() / (double)RAND_MAX, 1.0); 
-
-            sceneObjects.push_back(new Sphere("Diffuse Sphere", vec3(-1.0 + (float)ki/10.0, -1.5, -1.0 + (float)ki / 10.0), 0.5));
+            double sizeSp = 0.05 + 0.35*std::rand() / (double)RAND_MAX;
+            double x = -2.0 + sizeSp + (4.0 - 2.0 * sizeSp) * (std::rand() / (double)(RAND_MAX));
+            double z = -1.5 + 2.5 * (std::rand() / (double)(RAND_MAX)); 
+            double y = -2.0 + sizeSp + (4.0 - 2.0 - sizeSp) * (std::rand() / (double)(RAND_MAX));
+            vec3 spherePos = vec3(x, y , z);
+            std::string name = "Amb + Diffuse Sphere " + std::to_string(ki);
+            sceneObjects.push_back(new Sphere(name, spherePos, sizeSp));
             Object::ShadingValues _shadingValues;
             _shadingValues.color = col;
             _shadingValues.Ka = 0.2;
@@ -895,8 +905,64 @@ void initCornellBox2() {
         }
     }
 
-
+    // Mirrored
+    for (unsigned int ki = 0; ki < 3; ki++)
     {
+
+        {
+            vec4 col = vec4(std::rand() / (double)RAND_MAX, std::rand() / (double)RAND_MAX, std::rand() / (double)RAND_MAX, 1.0);
+            double sizeSp = 0.05 + 0.5 * std::rand() / (double)RAND_MAX;
+            double x = -2.0 + sizeSp + (4.0 - 2.0*sizeSp) * (std::rand() / (double)(RAND_MAX));
+            double z = -1.5 + 2.5 * (std::rand() / (double)(RAND_MAX));
+            double y = -2.0 + sizeSp + (4.0 - 2.0 - sizeSp) * (std::rand() / (double)(RAND_MAX));
+            vec3 spherePos = vec3(x, -2.0 + sizeSp, z);
+            std::string name = "Mirrored Sphere " + std::to_string(ki); 
+
+            sceneObjects.push_back(new Sphere(name.c_str(), spherePos, sizeSp));
+            Object::ShadingValues _shadingValues;
+            _shadingValues.color = col;
+            _shadingValues.Ka = 0.0;
+            _shadingValues.Kd = 0.2;
+            _shadingValues.Ks = 0.8;
+            _shadingValues.Kn = 16.0;
+            _shadingValues.Kt = 0.0;
+            _shadingValues.Kr = 0.0;
+            sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+            sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+
+        }
+    }
+
+    // Mini Glass 
+    for (unsigned int ki = 0; ki < 3; ki++)
+    {
+
+        {
+            double sizeSp = 0.05 + 0.35 * std::rand() / (double)RAND_MAX;
+            double x = -2.0 + sizeSp + (4.0 - 2.0 * sizeSp) * (std::rand() / (double)(RAND_MAX));
+            double z = -1.5 + 2.5 * (std::rand() / (double)(RAND_MAX));
+            double y = -2.0 + sizeSp + (4.0 - 2.0 - sizeSp) * (std::rand() / (double)(RAND_MAX));
+            vec3 spherePos = vec3(x, y, z);
+            std::string name = "Glass Sphere " + std::to_string(ki);
+
+            sceneObjects.push_back(new Sphere(name.c_str(), spherePos, sizeSp));
+            Object::ShadingValues _shadingValues;
+            _shadingValues.color = vec4(0.9, 0.1, 0.1, 1.0);
+            _shadingValues.Ka = 0.0;
+            _shadingValues.Kd = 0.0;
+            _shadingValues.Ks = 0.0; // reflexion speculaire
+            _shadingValues.Kn = 16.0;// shininess
+            _shadingValues.Kt = 1.0; // coefficient de transmission
+            _shadingValues.Kr = 1.4; // indice de refraction
+            sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
+            sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
+
+        }
+    }
+
+
+
+    /*{
         sceneObjects.push_back(new Sphere("Diffuse Sphere", vec3(1.0, -1.25, -0.5),0.5));
         Object::ShadingValues _shadingValues;
         _shadingValues.color = vec4(1.0, 0.0, 0.0, 1.0);
@@ -993,7 +1059,7 @@ void initCornellBox2() {
         _shadingValues.Kr = 1.4; // indice de refraction
         sceneObjects[sceneObjects.size() - 1]->setShadingValues(_shadingValues);
         sceneObjects[sceneObjects.size() - 1]->setModelView(mat4());
-    }
+    }*/
 }
 
 
